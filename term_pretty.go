@@ -14,19 +14,19 @@ var balanced = map[itemType]itemType{
 	itemBegMap: itemEndCurly,
 }
 
-type prettier struct {
+type indenter struct {
 	out io.Writer
 	n int
 	spaces string
 	printed bool
 }
 
-func (p *prettier) newline() {
+func (p *indenter) newline() {
 	fmt.Fprint(p.out, "\n")
 	p.printed = false
 }
 
-func (p *prettier) indent(dir bool) {
+func (p *indenter) indent(dir bool) {
 	p.newline()
 	if dir {
 		p.n++
@@ -37,7 +37,7 @@ func (p *prettier) indent(dir bool) {
 	p.spaces = strings.Repeat(indentOne, p.n)
 }
 
-func (p *prettier) print(val string) {
+func (p *indenter) print(val string) {
 	if !p.printed {
 		fmt.Fprint(p.out, p.spaces)
 		p.printed = true
@@ -46,7 +46,7 @@ func (p *prettier) print(val string) {
 }
 
 func prettyErlTerm(in chan item, out io.Writer) error {
-	p := &prettier{out: out}
+	p := &indenter{out: out}
 	item := <-in
 	nested := make([]itemType, 0, 8)
 Loop:
