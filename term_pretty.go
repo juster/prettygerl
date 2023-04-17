@@ -48,7 +48,7 @@ func (p *indenter) print(val string) {
 func prettyErlTerm(in chan item, out io.Writer) error {
 	p := &indenter{out: out}
 	item := <-in
-	nested := make([]itemType, 0, 8)
+	stack := make([]itemType, 0, 8)
 Loop:
 	for {
 		peek := <-in
@@ -60,12 +60,13 @@ Loop:
 			return fmt.Errorf("parse error: %s", item.val)
 		case itemEndList, itemEndCurly, itemEndBinary:
 			// de-indent before printing closing delimeter
-			if len(nested) > 0 {
-				nested = nested[:len(nested)-1]
-			}
-			if item.typ != itemEndBinary {
+			switch {
+			case item.typ == itemEndBinary:
+			case isPropList(stack):
+			default:
 				p.indent(false)
 			}
+			stack = pop(stack)
 		case itemArrow:
 			p.print(" ")
 		}
@@ -74,11 +75,14 @@ Loop:
 
 		switch item.typ {
 		case itemComma:
-			if len(nested) > 0 && nested[len(nested)-1] == itemBegBinary {
+			switch {
+			case topEquals(stack, itemBegBinary):
 				fmt.Fprint(out, " ")
-				break
+			case isPropList(stack):
+				fmt.Fprint(out, " ")
+			default:
+				p.newline()
 			}
-			p.newline()
 		case itemArrow:
 			p.print(" ")
 		case itemBegList, itemBegTuple, itemBegBinary, itemBegMap:
@@ -87,14 +91,50 @@ Loop:
 				p.print(peek.val)
 				peek = <-in // skip the lookahead
 			} else {
-				nested = append(nested, item.typ)
-				if item.typ != itemBegBinary {
+				switch item.typ {
+				case itemBegTuple:
+					// avoids indenting tuples in property lists on their same line
+					if topEquals(stack, itemBegList) {
+						break
+					}
+					p.indent(true)
+				case itemBegBinary:
+					break
+				default:
 					p.indent(true)
 				}
+				stack = push(stack, item.typ)
 			}
 		}
 		item = peek
 	}
 	p.newline()
 	return nil
+}
+
+func push(stack []itemType, new itemType) []itemType {
+	return append([]itemType{new}, stack...)
+}
+
+func pop(stack []itemType) []itemType {
+	if len(stack) == 0 {
+		return stack
+	}
+	return stack[1:]
+}
+
+func isPropList(stack []itemType) bool {
+	return topEquals(stack, itemBegTuple, itemBegList)
+}
+
+func topEquals(stack []itemType, want ...itemType) bool {
+	if len(stack) < len(want) {
+		return false
+	}
+	for i, t := range want {
+		if stack[i] != t {
+			return false
+		}
+	}
+	return true
 }
