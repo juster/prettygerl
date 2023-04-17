@@ -5,10 +5,9 @@ import (
 )
 
 const (
-	itemAtom itemType = iota
+	itemAtom itemType = iota + itemError + 1
 	itemNumber
 	itemString
-	itemBinary
 	itemBegList
 	itemEndList
 	itemBegTuple
@@ -175,6 +174,7 @@ Loop:
 	return lexTerm
 }
 
-func lexErlTerm(name, input string) (*lexer, chan item) {
-	return lex(name, input, lexTerm)
+func lexErlTerm(name, input string) chan item {
+	_, items := lex(name, input, lexTerm)
+	return items
 }
