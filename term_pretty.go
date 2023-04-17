@@ -10,7 +10,8 @@ const indentOne = "  "
 
 var balanced = map[itemType]itemType{
 	itemBegList: itemEndList,
-	itemBegTuple: itemEndTuple,
+	itemBegTuple: itemEndCurly,
+	itemBegMap: itemEndCurly,
 }
 
 type prettier struct {
@@ -27,7 +28,7 @@ func (p *prettier) newline() {
 
 func (p *prettier) indent(dir bool) {
 	p.newline()
-	if(dir){
+	if dir {
 		p.n++
 	} else if p.n--; p.n < 0 {
 		p.n = 0
@@ -57,24 +58,30 @@ Loop:
 			break Loop
 		case itemError:
 			return fmt.Errorf("parse error: %s", item.val)
-		case itemEndList, itemEndTuple, itemEndBinary:
+		case itemEndList, itemEndCurly, itemEndBinary:
 			// de-indent before printing closing delimeter
-			nested = nested[:len(nested)-1]
+			if len(nested) > 0 {
+				nested = nested[:len(nested)-1]
+			}
 			if item.typ != itemEndBinary {
 				p.indent(false)
 			}
+		case itemArrow:
+			p.print(" ")
 		}
 
 		p.print(item.val)
 
 		switch item.typ {
 		case itemComma:
-			if nested[len(nested)-1] == itemBegBinary {
+			if len(nested) > 0 && nested[len(nested)-1] == itemBegBinary {
 				fmt.Fprint(out, " ")
 				break
 			}
 			p.newline()
-		case itemBegList, itemBegTuple, itemBegBinary:
+		case itemArrow:
+			p.print(" ")
+		case itemBegList, itemBegTuple, itemBegBinary, itemBegMap:
 			// indent after printing open delimiter, unless it's empty
 			if t, ok := balanced[item.typ]; ok && t == peek.typ {
 				p.print(peek.val)

@@ -11,9 +11,11 @@ const (
 	itemBegList
 	itemEndList
 	itemBegTuple
-	itemEndTuple
+	itemEndCurly
 	itemBegBinary
 	itemEndBinary
+	itemBegMap
+	itemArrow
 	itemComment
 	itemComma
 	itemDot
@@ -22,7 +24,7 @@ const (
 
 var singles = map[rune]itemType{
 	'{': itemBegTuple,
-	'}': itemEndTuple,
+	'}': itemEndCurly,
 	'[': itemBegList,
 	']': itemEndList,
 	',': itemComma,
@@ -59,7 +61,7 @@ func lexTerm(l *lexer) stateFn {
 		return lexTerm
 	case r == '>':
 		if r = l.next(); r != '>' {
-			l.errorf("expected binary end")
+			return l.errorf("expected binary end")
 		}
 		l.emit(itemEndBinary)
 		return lexTerm
@@ -73,6 +75,18 @@ func lexTerm(l *lexer) stateFn {
 		}
 		l.backup()
 		l.emit(itemDot)
+		return lexTerm
+	case r == '#':
+		if l.next() != '{' {
+			return l.errorf("found # but without #{")
+		}
+		l.emit(itemBegMap)
+		return lexTerm
+	case r == '=':
+		if l.next() != '>' {
+			return l.errorf("found = but without =>")
+		}
+		l.emit(itemArrow)
 		return lexTerm
 	}
 	if t, ok := singles[r]; ok {
