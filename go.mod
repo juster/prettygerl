@@ -1,3 +1,3 @@
-module github.com/juster/gerlfmt
+module github.com/juster/prettygerl
 
 go 1.17
