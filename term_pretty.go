@@ -63,6 +63,7 @@ Loop:
 			switch {
 			case item.typ == itemEndBinary:
 			case isPropList(stack):
+				// ... except these since we didn't indent them
 			default:
 				p.indent(false)
 			}
@@ -76,9 +77,7 @@ Loop:
 		switch item.typ {
 		case itemComma:
 			switch {
-			case topEquals(stack, itemBegBinary):
-				fmt.Fprint(out, " ")
-			case isPropList(stack):
+			case topEquals(stack, itemBegBinary) || isPropList(stack):
 				fmt.Fprint(out, " ")
 			default:
 				p.newline()
@@ -90,21 +89,17 @@ Loop:
 			if t, ok := balanced[item.typ]; ok && t == peek.typ {
 				p.print(peek.val)
 				peek = <-in // skip the lookahead
-			} else {
-				switch item.typ {
-				case itemBegTuple:
-					// avoids indenting tuples in property lists on their same line
-					if topEquals(stack, itemBegList) {
-						break
-					}
-					p.indent(true)
-				case itemBegBinary:
-					break
-				default:
-					p.indent(true)
-				}
-				stack = push(stack, item.typ)
+				break
 			}
+			switch {
+			case item.typ == itemBegTuple && topEquals(stack, itemBegList):
+				// avoids indenting tuples in property lists on their same line
+			case item.typ == itemBegBinary:
+				// avoids indenting binaries, they're balanced but not nested
+			default:
+				p.indent(true)
+			}
+			stack = push(stack, item.typ)
 		}
 		item = peek
 	}
