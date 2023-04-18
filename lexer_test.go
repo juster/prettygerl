@@ -121,7 +121,7 @@ var runs = []lexRun{
 			{itemNumber, "255"},
 			{itemComma, ","},
 			{itemNumber, "128"},
-			{itemEndTuple, "}"},
+			{itemEndCurly, "}"},
 			{itemDot, "."},
 			{itemEOF, ""},
 		},
@@ -134,7 +134,7 @@ var runs = []lexRun{
 			{itemBegBinary, "<<"},
 			{itemNumber, "0"},
 			{itemEndBinary, ">>"},
-			{itemEndTuple, "}"},
+			{itemEndCurly, "}"},
 			{itemEndList, "]"},
 			{itemDot, "."},
 			{itemComment, "% to be ..."},
@@ -147,16 +147,16 @@ var runs = []lexRun{
 }
 
 func TestLexer(t *testing.T) {
-	_, eof_ch := lexErlTerm("eof_test", "")
+	eof_ch := lexErlTerm("eof_test", "")
 	want := item{itemEOF, ""}
 	for i := 0; i < 5; i++ {
 		if eof_item := <-eof_ch; eof_item != want {
 			t.Errorf("expected EOF as empty value")
 		}
 	}
-	
+
 	for i, run := range runs {
-		_, ch := lexErlTerm("lex_test", run.input)
+		ch := lexErlTerm("lex_test", run.input)
 		for j, ex := range run.output {
 			if item := <-ch; item != ex {
 				t.Errorf("case %d, item %d: expected %#v, got %#v", i, j, ex, item)
