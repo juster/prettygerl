@@ -1,6 +1,7 @@
 package main
 
 import (
+	"io"
 	"strings"
 )
 
@@ -46,21 +47,19 @@ func lexTerm(l *lexer) stateFn {
 		l.ignore()
 		return lexTerm
 	case r == '\'' || r >= 'a' && r <= 'z':
-		l.backup()
 		return lexAtom
 	case r == '%':
 		return lexComment
 	case strings.IndexRune(digits, r) >= 0 || r == '-':
-		l.backup()
 		return lexNumber
 	case r == '<':
-		if r = l.next(); r != '<' {
+		if l.next() != '<' {
 			l.errorf("expected binary begin")
 		}
 		l.emit(itemBegBinary)
 		return lexTerm
 	case r == '>':
-		if r = l.next(); r != '>' {
+		if l.next() != '>' {
 			return l.errorf("expected binary end")
 		}
 		l.emit(itemEndBinary)
@@ -68,13 +67,23 @@ func lexTerm(l *lexer) stateFn {
 	case r == '"':
 		return lexString
 	case r == '.':
-		if l.next() == '.' && l.peek() == '.' {
-			l.next()
-			l.emit(itemEllipsis)
+		// 1 dot found.
+		if l.peek() != '.' {
+			l.emit(itemDot)
 			return lexTerm
 		}
-		l.backup()
-		l.emit(itemDot)
+		l.next()
+
+		// 2 dots found.
+		if l.peek() != '.' {
+			l.emit(itemDot)
+			l.emit(itemDot)
+			return lexTerm
+		}
+		l.next()
+
+		// 3 dots found
+		l.emit(itemEllipsis)
 		return lexTerm
 	case r == '#':
 		if l.next() != '{' {
@@ -89,46 +98,48 @@ func lexTerm(l *lexer) stateFn {
 		l.emit(itemArrow)
 		return lexTerm
 	}
-	if t, ok := singles[r]; ok {
-		l.emit(t)
+	if tok, ok := singles[r]; ok {
+		l.emit(tok)
 		return lexTerm
 	}
 	return l.errorf("unexpected char: %c", r)
 }
 
 func lexAtom(l *lexer) stateFn {
-	r := l.next()
-	if r == '\'' {
-		i := strings.IndexRune(l.input[l.pos:], '\'')
-		if i < 0 {
-			return l.errorf("missing closing '")
+	if l.buf[0] == '\'' {
+		for {
+			r2 := l.next()
+			switch r2 {
+			case '\'':
+				l.emit(itemAtom)
+				return lexTerm
+			case eof:
+				return l.errorf("missing closing '")
+			}
 		}
-		l.pos += i + 1
-		l.emit(itemAtom)
-		return lexTerm
 	}
 
-	for ; ; r = l.next() {
+Loop:
+	for ; ; l.next() {
+		r := l.peek()
 		switch {
 		case (r >= 'a' && r <= 'z') || isDigital(r):
-			continue
 		case r == '_' || r == '@':
-			continue
+		default:
+			break Loop
 		}
-		l.backup()
-		if l.pos <= l.start {
-			return l.errorf("invalid atom")
-		}
-		break
 	}
 	l.emit(itemAtom)
 	return lexTerm
 }
 
 func lexNumber(l *lexer) stateFn {
-	l.accept("-")
-	if !l.acceptRun(digits) {
-		return l.errorf("expected number")
+	if l.buf[0] == '-' {
+		if !l.acceptRun(digits) {
+			return l.errorf("expected number")
+		}
+	} else {
+		l.acceptRun(digits)
 	}
 	if l.peek() != '.' {
 		goto Done
@@ -138,9 +149,12 @@ func lexNumber(l *lexer) stateFn {
 		// The dot can either represent:
 		// 1) a floating point number
 		// 2) the end of a term
-		// If there is no number, putback the dot.
-		l.backup()
-		goto Done
+		// If there is no number after dot, it's the end of a term
+		dot := l.backup()
+		l.emit(itemNumber)
+		l.putBack(dot)
+		l.emit(itemDot)
+		return lexTerm
 	}
 	l.acceptRun(digits)
 	if !l.accept("e") {
@@ -157,20 +171,22 @@ Done:
 }
 
 func lexComment(l *lexer) stateFn {
-	if i := strings.IndexRune(l.input[l.pos:], '\n'); i < 0 {
-		l.pos = len(l.input)
-	} else {
-		l.pos += i
+	for {
+		r := l.peek()
+		if r == '\n' || r == eof {
+			break
+		}
+		l.next()
 	}
 	l.emit(itemComment)
 	return lexTerm
 }
 
 func lexString(l *lexer) stateFn {
-	r := l.next()
 	esc := false
 Loop:
-	for ; ; r = l.next() {
+	for {
+		r := l.next()
 		switch r {
 		case '\\':
 			esc = true
@@ -188,7 +204,7 @@ Loop:
 	return lexTerm
 }
 
-func lexErlTerm(name, input string) chan item {
-	_, items := lex(name, input, lexTerm)
+func lexErlTerm(name string, rdr io.RuneReader) chan item {
+	_, items := lex(name, rdr, lexTerm)
 	return items
 }
