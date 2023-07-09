@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 )
 
@@ -146,21 +148,26 @@ var runs = []lexRun{
 	},
 }
 
-func TestLexer(t *testing.T) {
-	eof_ch := lexErlTerm("eof_test", "")
+func TestEOF(t *testing.T) {
+	eof_ch := lexErlTerm("eof_test", strings.NewReader(""))
 	want := item{itemEOF, ""}
 	for i := 0; i < 5; i++ {
 		if eof_item := <-eof_ch; eof_item != want {
 			t.Errorf("expected EOF as empty value")
 		}
 	}
+}
 
+func TestLexer(t *testing.T) {
 	for i, run := range runs {
-		ch := lexErlTerm("lex_test", run.input)
-		for j, ex := range run.output {
-			if item := <-ch; item != ex {
-				t.Errorf("case %d, item %d: expected %#v, got %#v", i, j, ex, item)
+		t.Run(fmt.Sprintf("Case%d", i), func(t *testing.T) {
+			ch := lexErlTerm("lex_test", strings.NewReader(run.input))
+			for j, ex := range run.output {
+				item := <-ch
+				if item != ex {
+					t.Errorf("case %d, item %d: expected %#v, got %#v", i, j, ex, item)
+				}
 			}
-		}
+		})
 	}
 }
