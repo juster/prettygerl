@@ -9,15 +9,15 @@ import (
 const indentOne = "  "
 
 var balanced = map[itemType]itemType{
-	itemBegList: itemEndList,
+	itemBegList:  itemEndList,
 	itemBegTuple: itemEndCurly,
-	itemBegMap: itemEndCurly,
+	itemBegMap:   itemEndCurly,
 }
 
 type indenter struct {
-	out io.Writer
-	n int
-	spaces string
+	out     io.Writer
+	n       int
+	spaces  string
 	printed bool
 }
 
@@ -47,12 +47,12 @@ func (p *indenter) print(val string) {
 
 func prettyErlTerm(in chan item, out io.Writer) error {
 	p := &indenter{out: out}
-	item := <-in
 	stack := make([]itemType, 0, 8)
+	item := <-in
+
 Loop:
 	for {
-		peek := <-in
-		//fmt.Printf("*DBG* item=%#v -- peek=%#v\n", item, peek)
+		//fmt.Printf("*DBG* item=%#v\n", item)
 		switch item.typ {
 		case itemEOF:
 			break Loop
@@ -75,6 +75,8 @@ Loop:
 		p.print(item.val)
 
 		switch item.typ {
+		case itemDot:
+			p.newline()
 		case itemComma:
 			switch {
 			case topEquals(stack, itemBegBinary) || isPropList(stack):
@@ -86,9 +88,10 @@ Loop:
 			p.print(" ")
 		case itemBegList, itemBegTuple, itemBegBinary, itemBegMap:
 			// indent after printing open delimiter, unless it's empty
+			peek := <-in
+			//fmt.Printf("*DBG* item=%#v -- peek=%#v\n", item, peek)
 			if t, ok := balanced[item.typ]; ok && t == peek.typ {
 				p.print(peek.val)
-				peek = <-in // skip the lookahead
 				break
 			}
 			switch {
@@ -100,10 +103,14 @@ Loop:
 				p.indent(true)
 			}
 			stack = push(stack, item.typ)
+
+			item = peek
+			continue Loop
 		}
-		item = peek
+
+		item = <-in
 	}
-	p.newline()
+	//p.newline()
 	return nil
 }
 
