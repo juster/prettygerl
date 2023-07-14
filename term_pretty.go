@@ -15,15 +15,20 @@ var balanced = map[itemType]itemType{
 }
 
 type indenter struct {
-	out     io.Writer
-	n       int
-	spaces  string
-	printed bool
+	out       io.Writer
+	n         int
+	spaces    string
+	indented  bool
+	dirtyline bool
 }
 
 func (p *indenter) newline() {
+	if !p.dirtyline {
+		return
+	}
 	fmt.Fprint(p.out, "\n")
-	p.printed = false
+	p.indented = false
+	p.dirtyline = false
 }
 
 func (p *indenter) indent(dir bool) {
@@ -33,16 +38,16 @@ func (p *indenter) indent(dir bool) {
 	} else if p.n--; p.n < 0 {
 		p.n = 0
 	}
-	//fmt.Printf("*DBG* n=%v\n", p.n)
 	p.spaces = strings.Repeat(indentOne, p.n)
 }
 
 func (p *indenter) print(val string) {
-	if !p.printed {
+	if !p.indented {
 		fmt.Fprint(p.out, p.spaces)
-		p.printed = true
+		p.indented = true
 	}
 	fmt.Fprint(p.out, val)
+	p.dirtyline = true
 }
 
 func prettyErlTerm(in chan item, out io.Writer) error {
@@ -75,7 +80,7 @@ Loop:
 		p.print(item.val)
 
 		switch item.typ {
-		case itemDot:
+		case itemDot, itemComment:
 			p.newline()
 		case itemComma:
 			switch {
