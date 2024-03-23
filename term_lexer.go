@@ -187,18 +187,18 @@ func lexString(l *lexer) stateFn {
 Loop:
 	for {
 		r := l.next()
+		if esc {
+			esc = false
+			continue
+		}
 		switch r {
 		case '\\':
 			esc = true
-			continue
 		case '"':
-			if !esc {
-				break Loop
-			}
+			break Loop
 		case eof:
 			return l.errorf("missing closing \"")
 		}
-		esc = false
 	}
 	l.emit(itemString)
 	return lexTerm

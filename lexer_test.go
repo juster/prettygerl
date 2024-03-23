@@ -95,6 +95,12 @@ var runs = []lexRun{
 		},
 	},
 	{
+		`"escaped\ dquote\nin\\the\"string".`,
+		[]item{
+			{itemString, `"escaped\ dquote\nin\\the\"string"`},
+		},
+	},
+	{
 		`<<"foo", 255, 128, ...>>.`,
 		[]item{
 			{itemBegBinary, "<<"},
