@@ -125,6 +125,16 @@ func (l *lexer) acceptRun(valid string) bool {
 	return accepted
 }
 
+// acceptString consumes a sequence of runes if they match the string literal
+func (l *lexer) acceptString(valid string) bool {
+	for _, r := range valid {
+		if l.next() != r {
+			return false
+		}
+	}
+	return true
+}
+
 func (l *lexer) errorf(format string, args ...interface{}) stateFn {
 	l.items <- item{
 		itemError,

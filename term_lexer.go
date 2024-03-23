@@ -21,6 +21,8 @@ const (
 	itemComma
 	itemDot
 	itemEllipsis
+	itemReference
+	itemPid
 )
 
 var singles = map[rune]itemType{
@@ -53,6 +55,10 @@ func lexTerm(l *lexer) stateFn {
 	case strings.IndexRune(digits, r) >= 0 || r == '-':
 		return lexNumber
 	case r == '<':
+		if isDigital(l.peek()) {
+			l.next()
+			return lexDottedId(itemPid)
+		}
 		if l.next() != '<' {
 			l.errorf("expected binary begin")
 		}
@@ -86,11 +92,15 @@ func lexTerm(l *lexer) stateFn {
 		l.emit(itemEllipsis)
 		return lexTerm
 	case r == '#':
-		if l.next() != '{' {
-			return l.errorf("found # but without #{")
+		if l.peek() == '{' {
+			l.next()
+			l.emit(itemBegMap)
+			return lexTerm
 		}
-		l.emit(itemBegMap)
-		return lexTerm
+		if l.acceptString("Ref<") {
+			return lexDottedId(itemReference)
+		}
+		return l.errorf("found # but without #{")
 	case r == '=':
 		if l.next() != '>' {
 			return l.errorf("found = but without =>")
@@ -202,6 +212,30 @@ Loop:
 	}
 	l.emit(itemString)
 	return lexTerm
+}
+
+func lexDottedId(t itemType) stateFn {
+	return func(l *lexer) stateFn {
+	Loop:
+		for {
+			r := l.next()
+			if isDigital(r) {
+				continue
+			}
+			switch r {
+			case '.':
+				// do nothing
+			case '>':
+				l.emit(t)
+				return lexTerm
+			case eof:
+				break Loop
+			default:
+				return l.errorf("invalid reference")
+			}
+		}
+		return l.errorf("missing closing >")
+	}
 }
 
 func lexErlTerm(name string, rdr io.RuneReader) chan item {

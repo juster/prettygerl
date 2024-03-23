@@ -152,6 +152,18 @@ var runs = []lexRun{
 			{itemEOF, ""},
 		},
 	},
+	{
+		"#Ref<0.1093657314.3741581315.88317>.",
+		[]item{
+			{itemReference, "#Ref<0.1093657314.3741581315.88317>"},
+		},
+	},
+	{
+		"<0.83.0>.",
+		[]item{
+			{itemPid, "<0.83.0>"},
+		},
+	},
 }
 
 func TestEOF(t *testing.T) {
